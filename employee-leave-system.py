@@ -526,4 +526,62 @@ elif choice == "إدارة المستخدمين والصلاحيات":
 
 elif choice == "🖨️ طباعة البيانات والتقارير":
     st.subheader(f"🖨️ التقارير المعتمدة - {company_display_name}")
-    render_printable_table(st
+    render_printable_table(st.session_state.employees)
+
+elif choice == "⚙️ إعدادات وبيانات الشركة":
+    st.subheader("⚙️ إعدادات وتعديل بيانات الشركة وشعارها الرسمي")
+    with st.form("company_settings_form"):
+        c_name = st.text_input("اسم الشركة / المؤسسة", value=st.session_state.company_info.get("name", ""))
+        c_license = st.text_input("رقم الترخيص", value=st.session_state.company_info.get("license", ""), disabled=True)
+        c_address = st.text_input("عنوان الشركة", value=st.session_state.company_info.get("address", ""))
+        col_s1, col_s2 = st.columns(2)
+        with col_s1: c_cr = st.text_input("رقم السجل التجاري", value=st.session_state.company_info.get("cr", ""))
+        with col_s2: c_tax = st.text_input("رقم البطاقة الضريبية", value=st.session_state.company_info.get("tax", ""))
+        c_contact = st.text_area("بيانات التواصل", value=st.session_state.company_info.get("contact", ""))
+        uploaded_logo = st.file_uploader("رفع شعار الشركة (Logo) بصيغة PNG أو JPG", type=["png", "jpg", "jpeg"])
+        save_settings = st.form_submit_button("حفظ التغييرات والشعار")
+        
+        if save_settings:
+            st.session_state.company_info["name"] = c_name
+            st.session_state.company_info["address"] = c_address
+            st.session_state.company_info["cr"] = c_cr
+            st.session_state.company_info["tax"] = c_tax
+            st.session_state.company_info["contact"] = c_contact
+            if uploaded_logo is not None:
+                try:
+                    bytes_data = uploaded_logo.getvalue()
+                    b64_str = base64.b64encode(bytes_data).decode()
+                    st.session_state.company_info["logo"] = b64_str
+                except Exception as e:
+                    st.error(f"خطأ أثناء معالجة الشعار: {e}")
+            auto_save_data()
+            st.success("تم تحديث بيانات الشركة والشعار بنجاح!")
+            st.rerun()
+
+elif choice == "📥 تحميل البيانات (Excel)":
+    st.subheader("📥 تصدير وتحميل بيانات النظام بصيغة Excel")
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        st.session_state.employees.to_excel(writer, sheet_name='الموظفين', index=False)
+        st.session_state.requests.to_excel(writer, sheet_name='سجل الإجازات', index=False)
+        st.session_state.users.to_excel(writer, sheet_name='المستخدمين والصلاحيات', index=False)
+    output.seek(0)
+    st.download_button(label="تحميل ملف الإكسيل الآن", data=output, file_name=f"Leave_System_{company_id}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+elif choice == "💾 النسخة الاحتياطية":
+    st.subheader("💾 إدارة النسخ الاحتياطية")
+    backup_dict = {
+        "employees": st.session_state.employees.to_dict(orient='records'),
+        "requests": st.session_state.requests.to_dict(orient='records'),
+        "users": st.session_state.users.to_dict(orient='records')
+    }
+    st.download_button("تحميل النسخة الاحتياطية (JSON)", data=json.dumps(backup_dict, ensure_ascii=False, indent=4), file_name=f"backup_{company_id}.json", mime="application/json")
+
+elif choice == "🗑️ مسح وحذف البيانات":
+    st.subheader("🗑️ مسح كافة بيانات الشركة الحالية")
+    if st.button("تفريغ بيانات الشركة", type="primary"):
+        st.session_state.employees = pd.DataFrame(columns=["كود الموظف", "اسم الموظف", "الوظيفة", "القسم", "الفرع", "رصيد سنوي (إجمالي)", "سنوي مستهلك", "سنوي متبقي"])
+        st.session_state.requests = pd.DataFrame(columns=["رقم الطلب", "كود الموظف", "اسم الموظف", "نوع الإجازة", "الحالة"])
+        auto_save_data()
+        st.success("تم تفريغ البيانات بنجاح!")
+        st.rerun()
