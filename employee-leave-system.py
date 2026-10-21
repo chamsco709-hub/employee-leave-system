@@ -702,13 +702,20 @@ elif choice == "🖨️ طباعة البيانات والتقارير":
 
 elif choice == "⚙️ إعدادات وبيانات الشركة":
     st.subheader("⚙️ إعدادات وتعديل بيانات الشركة والشعار")
+    
     with st.form("company_settings_form"):
         c_name = st.text_input("اسم الشركة / المؤسسة", value=st.session_state.company_info.get("name", ""))
         c_address = st.text_input("عنوان الشركة", value=st.session_state.company_info.get("address", ""))
+        
         col_s1, col_s2 = st.columns(2)
-        with col_s1: c_cr = st.text_input("رقم السجل التجاري", value=st.session_state.company_info.get("cr", ""))
-        with col_s2: c_tax = st.text_input("رقم البطاقة الضريبية", value=st.session_state.company_info.get("tax", ""))
+        with col_s1:
+            c_cr = st.text_input("رقم السجل التجاري", value=st.session_state.company_info.get("cr", ""))
+        with col_s2:
+            c_tax = st.text_input("رقم البطاقة الضريبية", value=st.session_state.company_info.get("tax", ""))
+            
         c_contact = st.text_area("بيانات التواصل", value=st.session_state.company_info.get("contact", ""))
+        uploaded_logo = st.file_uploader("رفع أو تحديث شعار الشركة (Logo)", type=["png", "jpg", "jpeg"])
+        
         save_settings = st.form_submit_button("حفظ التغييرات")
         
         if save_settings:
@@ -717,8 +724,9 @@ elif choice == "⚙️ إعدادات وبيانات الشركة":
             st.session_state.company_info["cr"] = c_cr
             st.session_state.company_info["tax"] = c_tax
             st.session_state.company_info["contact"] = c_contact
-            auto_save_data()  # 💾 حفظ تلقائي معزول
-            st.success("تم تحديث بيانات الشركة بنجاح!")
+            if uploaded_logo is not None:
+                st.session_state.company_info["logo"] = uploaded_logo
+            st.success("تم تحديث البيانات والشعار بنجاح!")
             st.rerun()
 
 elif choice == "📥 تحميل البيانات (Excel)":
