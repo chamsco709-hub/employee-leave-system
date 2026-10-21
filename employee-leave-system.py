@@ -6,31 +6,6 @@ import base64
 import json
 import os
 
-# 🏢 مجلد مخصص لتخزين بيانات الشركات بشكل مستقل وعازل تماماً
-COMPANIES_DIR = "client_companies_data"
-if not os.path.exists(COMPANIES_DIR):
-    os.makedirs(COMPANIES_DIR)
-
-# ملف عام لتخزين قائمة الشركات المسجلة وأكوادها وترخيصاتها
-COMPANIES_LIST_FILE = os.path.join(COMPANIES_DIR, "all_registered_companies.json")
-
-def load_registered_companies():
-    """تحميل قائمة الشركات المسجلة في النظام"""
-    if os.path.exists(COMPANIES_LIST_FILE):
-        try:
-            with open(COMPANIES_LIST_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return {}
-    return {
-        "الشركة الافتراضية": {"id": "company_default", "license": "LIC-1001", "name": "الشركة الافتراضية الموحدة"}
-    }
-
-def save_registered_companies(comps):
-    """حفظ قائمة الشركات"""
-    with open(COMPANIES_LIST_FILE, "w", encoding="utf-8") as f:
-        json.dump(comps, f, ensure_ascii=False, indent=4)
-
 # ضبط إعدادات الصفحة وتفعيل الواجهة الواسعة
 st.set_page_config(
     page_title="النظام المتكامل لإدارة الإجازات",
@@ -39,7 +14,120 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 🎨 تصميم CSS مخصص
+# 🔑 ملف الترخيص الخاص بهذه النسخة المباعة للعميل (يتم وضعه مسبقاً مع النسخة الخاصة بالشركة)
+LICENSE_FILE = "client_license.json"
+
+def get_client_license():
+    """قراءة بيانات الترخيص والشركة الخاصة بهذه النسخة فقط"""
+    if os.path.exists(LICENSE_FILE):
+        try:
+            with open(LICENSE_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    # بيانات افتراضية في حال لم يتم ايجاد ملف الترخيص
+    return {
+        "id": "company_default",
+        "license": "LIC-1001",
+        "name": "الشركة الموحدة للبرمجيات"
+    }
+
+# جلب بيانات الشركة والترخيص المخصص لهذه النسخة فقط (بدون إظهار بوابة الشركات)
+client_data = get_client_license()
+company_id = client_data["id"]
+company_license = client_data["license"]
+company_display_name = client_data["name"]
+
+# مجلد تخزين بيانات الشركة الحالية المعزولة
+COMPANIES_DIR = "client_companies_data"
+if not os.path.exists(COMPANIES_DIR):
+    os.makedirs(COMPANIES_DIR)
+
+COMPANY_FILE = os.path.join(COMPANIES_DIR, f"{company_id}_data.json")
+
+# ---------------------------------------------------------
+# 💾 دوال الحفظ والاستعادة التلقائية المعزولة للشركة
+# ---------------------------------------------------------
+def load_company_data():
+    """تحميل بيانات الشركة الحالية المعزولة تماماً مع ضمان وجود كافة الأعمدة"""
+    if os.path.exists(COMPANY_FILE):
+        try:
+            with open(COMPANY_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                
+                if "employees" in data and len(data["employees"]) > 0:
+                    st.session_state.employees = pd.DataFrame(data["employees"])
+                else:
+                    st.session_state.employees = pd.DataFrame(columns=[
+                        "كود الموظف", "اسم الموظف", "الوظيفة", "القسم", "الفرع", "صلاحية الموظف",
+                        "رصيد سنوي (إجمالي)", "سنوي مستهلك", "سنوي متبقي",
+                        "رصيد أسبوعي (إجمالي)", "أسبوعي مستهلك", "أسبوعي متبقي",
+                        "رصيد رسمي (إجمالي)", "رسمي مستهلك", "رسمي متبقي"
+                    ])
+
+                if "requests" in data and len(data["requests"]) > 0:
+                    st.session_state.requests = pd.DataFrame(data["requests"])
+                else:
+                    st.session_state.requests = pd.DataFrame(columns=[
+                        "رقم الطلب", "كود الموظف", "اسم الموظف", "الوظيفة", "الفرع", "نوع الإجازة", "من تاريخ", "إلى تاريخ", "عدد الأيام", "الحالة"
+                    ])
+
+                if "users" in data and len(data["users"]) > 0:
+                    st.session_state.users = pd.DataFrame(data["users"])
+                else:
+                    st.session_state.users = pd.DataFrame([
+                        {"اسم المستخدم": "admin", "الاسم الكامل": "المدير العام", "الفرع التابع": "المركز الرئيسي", "القسم التابع": "الإدارة العليا", "الصلاحية": "مشرف عام (Admin)", "البريد الإلكتروني": "admin@company.com", "الحالة": "نشط", "الرسم السري": "1-2-3"}
+                    ])
+
+                if "company_info" in data:
+                    st.session_state.company_info = data["company_info"]
+        except Exception as e:
+            st.error(f"خطأ في تحميل ملف الشركة: {e}")
+    else:
+        st.session_state.employees = pd.DataFrame([
+            {
+                "كود الموظف": "EMP001", "اسم الموظف": "أحمد محمود", "الوظيفة": "محاسب أول", "القسم": "الإدارة المالية", "الفرع": "المركز الرئيسي",
+                "صلاحية الموظف": "اعتماد الطلبات",
+                "رصيد سنوي (إجمالي)": 21, "سنوي مستهلك": 3, "سنوي متبقي": 18,
+                "رصيد أسبوعي (إجمالي)": 4, "أسبوعي مستهلك": 1, "أسبوعي متبقي": 3,
+                "رصيد رسمي (إجمالي)": 10, "رسمي مستهلك": 2, "رسمي متبقي": 8
+            }
+        ])
+        st.session_state.requests = pd.DataFrame(columns=[
+            "رقم الطلب", "كود الموظف", "اسم الموظف", "الوظيفة", "الفرع", "نوع الإجازة", "من تاريخ", "إلى تاريخ", "عدد الأيام", "الحالة"
+        ])
+        st.session_state.users = pd.DataFrame([
+            {"اسم المستخدم": "admin", "الاسم الكامل": "المدير العام", "الفرع التابع": "المركز الرئيسي", "القسم التابع": "الإدارة العليا", "الصلاحية": "مشرف عام (Admin)", "البريد الإلكتروني": "admin@company.com", "الحالة": "نشط", "الرسم السري": "1-2-3"}
+        ])
+        st.session_state.company_info = {
+            "name": company_display_name,
+            "address": "القاهرة، جمهورية مصر العربية",
+            "cr": "123456",
+            "tax": "987-654-321",
+            "contact": "هاتف: 01000000000 | بريد: info@company.com",
+            "license": company_license,
+            "logo": None
+        }
+
+def auto_save_data():
+    """حفظ التغييرات في ملف هذه الشركة فقط"""
+    try:
+        data_to_save = {
+            "employees": st.session_state.employees.to_dict(orient='records'),
+            "requests": st.session_state.requests.to_dict(orient='records'),
+            "users": st.session_state.users.to_dict(orient='records'),
+            "company_info": st.session_state.company_info
+        }
+        with open(COMPANY_FILE, "w", encoding="utf-8") as f:
+            json.dump(data_to_save, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        print(f"خطأ في الحفظ التلقائي: {e}")
+
+load_company_data()
+st.session_state.company_info["name"] = company_display_name
+st.session_state.company_info["license"] = company_license
+
+# 🎨 تصميم CSS مخصص لإخفاء الأشرطة الجانبية والتحكم بالمظهر
 st.markdown("""
     <style>
     [data-testid="stSidebar"] { display: none !important; }
@@ -161,129 +249,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 🏢 إدارة اختيار أو إضافة الشركات في الشاشة الرئيسية (تظهر بوضوح)
-registered_companies = load_registered_companies()
-
-st.markdown("### 🏢 بوابة إدارة الشركات والترخيص")
-comp_options = list(registered_companies.keys()) + ["➕ إضافة شركة جديدة وترخيص..."]
-selected_comp_choice = st.selectbox("اختر الشركة الحالية للتشغيل:", comp_options)
-
-if selected_comp_choice == "➕ إضافة شركة جديدة وترخيص...":
-    st.markdown("---")
-    st.markdown("#### 📝 تسجيل شركة جديدة في النظام")
-    with st.form("new_company_reg_form"):
-        new_c_name = st.text_input("اسم الشركة الكامل")
-        new_c_id = st.text_input("كود الشركة (بالإنجليزية بدون مسافات - مثل: company_b)")
-        new_c_license = st.text_input("رقم الترخيص (License Key)")
-        reg_btn = st.form_submit_button("تسجيل الشركة وإنشاء بيئتها المعزولة")
-        
-        if reg_btn:
-            if new_c_name and new_c_id and new_c_license:
-                if new_c_id in [v["id"] for v in registered_companies.values()]:
-                    st.error("كود الشركة موجود مسبقاً!")
-                else:
-                    registered_companies[new_c_name] = {
-                        "id": new_c_id,
-                        "license": new_c_license,
-                        "name": new_c_name
-                    }
-                    save_registered_companies(registered_companies)
-                    st.success(f"تم تسجيل شركة {new_c_name} بنجاح! يرجى إعادة تحميل الصفحة لاختيارها.")
-                    st.rerun()
-            else:
-                st.error("يرجى ملء جميع الحقول المطلوبة.")
-    st.stop()
-
-# تحديد بيانات الشركة النشطة حالياً
-current_comp_data = registered_companies[selected_comp_choice]
-company_id = current_comp_data["id"]
-company_license = current_comp_data["license"]
-company_display_name = current_comp_data["name"]
-
-COMPANY_FILE = os.path.join(COMPANIES_DIR, f"{company_id}_data.json")
-
-# ---------------------------------------------------------
-# 💾 دوال الحفظ والاستعادة التلقائية المعزولة لكل شركة
-# ---------------------------------------------------------
-def load_company_data():
-    """تحميل بيانات الشركة الحالية المعزولة تماماً مع ضمان وجود كافة الأعمدة"""
-    if os.path.exists(COMPANY_FILE):
-        try:
-            with open(COMPANY_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                
-                if "employees" in data and len(data["employees"]) > 0:
-                    st.session_state.employees = pd.DataFrame(data["employees"])
-                else:
-                    st.session_state.employees = pd.DataFrame(columns=[
-                        "كود الموظف", "اسم الموظف", "الوظيفة", "القسم", "الفرع", "صلاحية الموظف",
-                        "رصيد سنوي (إجمالي)", "سنوي مستهلك", "سنوي متبقي",
-                        "رصيد أسبوعي (إجمالي)", "أسبوعي مستهلك", "أسبوعي متبقي",
-                        "رصيد رسمي (إجمالي)", "رسمي مستهلك", "رسمي متبقي"
-                    ])
-
-                if "requests" in data and len(data["requests"]) > 0:
-                    st.session_state.requests = pd.DataFrame(data["requests"])
-                else:
-                    st.session_state.requests = pd.DataFrame(columns=[
-                        "رقم الطلب", "كود الموظف", "اسم الموظف", "الوظيفة", "الفرع", "نوع الإجازة", "من تاريخ", "إلى تاريخ", "عدد الأيام", "الحالة"
-                    ])
-
-                if "users" in data and len(data["users"]) > 0:
-                    st.session_state.users = pd.DataFrame(data["users"])
-                else:
-                    st.session_state.users = pd.DataFrame([
-                        {"اسم المستخدم": "admin", "الاسم الكامل": "المدير العام", "الفرع التابع": "المركز الرئيسي", "القسم التابع": "الإدارة العليا", "الصلاحية": "مشرف عام (Admin)", "البريد الإلكتروني": "admin@company.com", "الحالة": "نشط", "الرسم السري": "1-2-3"}
-                    ])
-
-                if "company_info" in data:
-                    st.session_state.company_info = data["company_info"]
-        except Exception as e:
-            st.error(f"خطأ في تحميل ملف الشركة: {e}")
-    else:
-        st.session_state.employees = pd.DataFrame([
-            {
-                "كود الموظف": "EMP001", "اسم الموظف": "أحمد محمود", "الوظيفة": "محاسب أول", "القسم": "الإدارة المالية", "الفرع": "المركز الرئيسي",
-                "صلاحية الموظف": "اعتماد الطلبات",
-                "رصيد سنوي (إجمالي)": 21, "سنوي مستهلك": 3, "سنوي متبقي": 18,
-                "رصيد أسبوعي (إجمالي)": 4, "أسبوعي مستهلك": 1, "أسبوعي متبقي": 3,
-                "رصيد رسمي (إجمالي)": 10, "رسمي مستهلك": 2, "رسمي متبقي": 8
-            }
-        ])
-        st.session_state.requests = pd.DataFrame(columns=[
-            "رقم الطلب", "كود الموظف", "اسم الموظف", "الوظيفة", "الفرع", "نوع الإجازة", "من تاريخ", "إلى تاريخ", "عدد الأيام", "الحالة"
-        ])
-        st.session_state.users = pd.DataFrame([
-            {"اسم المستخدم": "admin", "الاسم الكامل": "المدير العام", "الفرع التابع": "المركز الرئيسي", "القسم التابع": "الإدارة العليا", "الصلاحية": "مشرف عام (Admin)", "البريد الإلكتروني": "admin@company.com", "الحالة": "نشط", "الرسم السري": "1-2-3"}
-        ])
-        st.session_state.company_info = {
-            "name": company_display_name,
-            "address": "القاهرة، جمهورية مصر العربية",
-            "cr": "123456",
-            "tax": "987-654-321",
-            "contact": "هاتف: 01000000000 | بريد: info@company.com",
-            "license": company_license,
-            "logo": None
-        }
-
-def auto_save_data():
-    """حفظ التغييرات في ملف الشركة الحالية فقط"""
-    try:
-        data_to_save = {
-            "employees": st.session_state.employees.to_dict(orient='records'),
-            "requests": st.session_state.requests.to_dict(orient='records'),
-            "users": st.session_state.users.to_dict(orient='records'),
-            "company_info": st.session_state.company_info
-        }
-        with open(COMPANY_FILE, "w", encoding="utf-8") as f:
-            json.dump(data_to_save, f, ensure_ascii=False, indent=4)
-    except Exception as e:
-        print(f"خطأ في الحفظ التلقائي: {e}")
-
-load_company_data()
-st.session_state.company_info["name"] = company_display_name
-st.session_state.company_info["license"] = company_license
-
 # حالة المصادقة
 if 'is_authenticated' not in st.session_state:
     st.session_state.is_authenticated = False
@@ -333,12 +298,12 @@ def render_company_header():
         </div>
     """, unsafe_allow_html=True)
 
-# 🔐 شاشة تسجيل الدخول
+# 🔐 شاشة تسجيل الدخول المخصصة للشركة
 if not st.session_state.is_authenticated:
     st.markdown(f"""
         <div style="max-width: 450px; margin: 40px auto; background: #ffffff; padding: 25px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; direction: rtl;">
-            <h2 style="color: #1f4068; margin-bottom: 10px;">🔐 تسجيل الدخول لـ: {company_display_name}</h2>
-            <p style="color: #666; font-size: 13px;">رقم الترخيص النشط: {company_license}</p>
+            <h2 style="color: #1f4068; margin-bottom: 10px;">🔐 تسجيل الدخول - {company_display_name}</h2>
+            <p style="color: #666; font-size: 13px;">رخصة النظام النشطة: {company_license}</p>
         </div>
     """, unsafe_allow_html=True)
     
@@ -398,8 +363,8 @@ col_info_bar, col_logout_bar = st.columns([5, 1])
 with col_info_bar:
     st.markdown(f"""
         <div style="background: #eef2f7; padding: 6px 12px; border-radius: 4px; font-size: 11px; margin-bottom: 8px; color: #1f4068; font-weight: bold; display: flex; gap: 15px; direction: rtl;">
-            <div>🏢 الشركة الحالية: {company_display_name}</div>
-            <div>🔑 رقم الترخيص: {company_license}</div>
+            <div>🏢 الشركة: {company_display_name}</div>
+            <div>🔑 رخصة التشغيل: {company_license}</div>
             <div>👤 المستخدم: {st.session_state.current_logged_user}</div>
             <div>🛡️ الصلاحية: {st.session_state.current_user_role}</div>
         </div>
@@ -472,7 +437,7 @@ if choice == "لوحة التحكم الرئيسية":
                             st.session_state.employees.loc[st.session_state.employees["كود الموظف"] == emp_code, "رسمي متبقي"] -= days
                     
                     auto_save_data()
-                    st.success(f"تم تحديث الطلب #{req_id} وحفظ البيانات للشركة بنجاح!")
+                    st.success(f"تم تحديث الطلب #{req_id} وحفظ البيانات بنجاح!")
                     st.rerun()
 
 elif choice == "تسجيل طلب إجازة":
@@ -561,7 +526,7 @@ elif choice == "⚙️ إعدادات وبيانات الشركة":
     st.subheader("⚙️ إعدادات وتعديل بيانات الشركة وشعارها الرسمي")
     with st.form("company_settings_form"):
         c_name = st.text_input("اسم الشركة / المؤسسة", value=st.session_state.company_info.get("name", ""))
-        c_license = st.text_input("رقم الترخيص", value=st.session_state.company_info.get("license", ""))
+        c_license = st.text_input("رقم الترخيص", value=st.session_state.company_info.get("license", ""), disabled=True)
         c_address = st.text_input("عنوان الشركة", value=st.session_state.company_info.get("address", ""))
         col_s1, col_s2 = st.columns(2)
         with col_s1: c_cr = st.text_input("رقم السجل التجاري", value=st.session_state.company_info.get("cr", ""))
@@ -572,7 +537,6 @@ elif choice == "⚙️ إعدادات وبيانات الشركة":
         
         if save_settings:
             st.session_state.company_info["name"] = c_name
-            st.session_state.company_info["license"] = c_license
             st.session_state.company_info["address"] = c_address
             st.session_state.company_info["cr"] = c_cr
             st.session_state.company_info["tax"] = c_tax
@@ -598,7 +562,7 @@ elif choice == "📥 تحميل البيانات (Excel)":
     output.seek(0)
     st.download_button(label="تحميل ملف الإكسيل الآن", data=output, file_name=f"Leave_System_{company_id}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-elif choice == "💾 النسخة الاحتياطية":
+elifchoice == "💾 النسخة الاحتياطية":
     st.subheader("💾 إدارة النسخ الاحتياطية")
     backup_dict = {
         "employees": st.session_state.employees.to_dict(orient='records'),
