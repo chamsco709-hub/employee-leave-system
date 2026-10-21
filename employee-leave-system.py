@@ -280,7 +280,8 @@ def render_company_header():
         except Exception:
             pass
             
-    st.markdown(f"""
+    st.markdown(
+        f"""
         <div class="company-header-container">
             <div class="header-top-system">
                 <h2>🏢 النظام المتكامل لإدارة الإجازات - شركة: {info.get("name", "")} (ترخيص: {info.get("license", "")})</h2>
@@ -296,16 +297,21 @@ def render_company_header():
                 </div>
             </div>
         </div>
-    """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True
+    )
 
 # 🔐 شاشة تسجيل الدخول المخصصة للشركة
 if not st.session_state.is_authenticated:
-    st.markdown(f"""
+    st.markdown(
+        f"""
         <div style="max-width: 450px; margin: 40px auto; background: #ffffff; padding: 25px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; direction: rtl;">
             <h2 style="color: #1f4068; margin-bottom: 10px;">🔐 تسجيل الدخول - {company_display_name}</h2>
             <p style="color: #666; font-size: 13px;">رخصة النظام النشطة: {company_license}</p>
         </div>
-    """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True
+    )
     
     col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
     with col_l2:
@@ -364,3 +370,160 @@ with col_info_bar:
     st.markdown(f"""
         <div style="background: #eef2f7; padding: 6px 12px; border-radius: 4px; font-size: 11px; margin-bottom: 8px; color: #1f4068; font-weight: bold; display: flex; gap: 15px; direction: rtl;">
             <div>🏢 الشركة: {company_display_name}</div>
+            <div>🔑 رخصة التشغيل: {company_license}</div>
+            <div>👤 المستخدم: {st.session_state.current_logged_user}</div>
+            <div>🛡️ الصلاحية: {st.session_state.current_user_role}</div>
+        </div>
+    """, unsafe_allow_html=True)
+with col_logout_bar:
+    if st.button("🚪 خروج آمن", use_container_width=True):
+        st.session_state.is_authenticated = False
+        st.session_state.current_logged_user = ""
+        st.rerun()
+
+choice = st.session_state.active_tab
+
+# المحتوى حسب التبويب المختار
+if choice == "لوحة التحكم الرئيسية":
+    st.markdown(f'<div class="section-header">📈 مؤشرات الأداء العامة لشركة: {company_display_name}</div>', unsafe_allow_html=True)
+    
+    branch_filter = st.session_state.current_user_branch
+    dept_filter = st.session_state.current_user_dept
+    
+    if "Admin" in st.session_state.current_user_role or "الإدارة العليا" in dept_filter:
+        view_employees = st.session_state.employees
+        view_requests = st.session_state.requests
+    else:
+        view_employees = st.session_state.employees[st.session_state.employees["الفرع"] == branch_filter]
+        view_requests = st.session_state.requests[st.session_state.requests["الفرع"] == branch_filter]
+    
+    total_emps = len(view_employees)
+    pending_count = len(view_requests[view_requests['الحالة'] == 'قيد الانتظار']) if not view_requests.empty else 0
+    accepted_count = len(view_requests[view_requests['الحالة'] == 'مقبول']) if not view_requests.empty else 0
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown(f'<div class="dashboard-card"><div class="dashboard-card-title">👥 إجمالي موظفي الشركة</div><div class="dashboard-card-value">{total_emps}</div></div>', unsafe_allow_html=True)
+    with col2:
+        st.markdown(f'<div class="dashboard-card" style="border-right-color: #f0ad4e;"><div class="dashboard-card-title">⏳ الطلبات المعلقة</div><div class="dashboard-card-value" style="color: #f0ad4e;">{pending_count}</div></div>', unsafe_allow_html=True)
+    with col3:
+        st.markdown(f'<div class="dashboard-card" style="border-right-color: #5cb85c;"><div class="dashboard-card-title">✅ الطلبات المقبولة</div><div class="dashboard-card-value" style="color: #5cb85c;">{accepted_count}</div></div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<div class="section-header">📋 أرصدة إجازات موظفي الشركة: {company_display_name}</div>', unsafe_allow_html=True)
+    render_printable_table(view_employees)
+    
+    st.markdown('<div class="section-header">⚡ مراجعة واعتماد طلبات الإجازات المباشرة</div>', unsafe_allow_html=True)
+    if view_requests.empty:
+        st.info("لا توجد طلبات إجازات مسجلة حالياً.")
+    else:
+        render_printable_table(view_requests)
+        pending_reqs = view_requests[view_requests["الحالة"] == "قيد الانتظار"]
+        if not pending_reqs.empty:
+            st.markdown("#### 🔄 اتخاذ قرار بشأن الطلبات المعلقة:")
+            col_id, col_action, col_btn = st.columns([2, 2, 1])
+            with col_id: req_id = st.selectbox("اختر رقم الطلب", pending_reqs["رقم الطلب"].tolist(), key="quick_req_id")
+            with col_action: action = st.radio("القرار", ["مقبول", "مرفوض"], horizontal=True, key="quick_action")
+            with col_btn:
+                st.write("")
+                if st.button("تنفيذ القرار", use_container_width=True):
+                    st.session_state.requests.loc[st.session_state.requests["رقم الطلب"] == req_id, "الحالة"] = action
+                    if action == "مقبول":
+                        row = st.session_state.requests[st.session_state.requests["رقم الطلب"] == req_id].iloc[0]
+                        emp_code = row["كود الموظف"]
+                        days = row["عدد الأيام"]
+                        l_type = row["نوع الإجازة"]
+                        if "سنوية" in l_type:
+                            st.session_state.employees.loc[st.session_state.employees["كود الموظف"] == emp_code, "سنوي مستهلك"] += days
+                            st.session_state.employees.loc[st.session_state.employees["كود الموظف"] == emp_code, "سنوي متبقي"] -= days
+                        elif "أسبوعية" in l_type:
+                            st.session_state.employees.loc[st.session_state.employees["كود الموظف"] == emp_code, "أسبوعي مستهلك"] += days
+                            st.session_state.employees.loc[st.session_state.employees["كود الموظف"] == emp_code, "أسبوعي متبقي"] -= days
+                        elif "رسمية" in l_type:
+                            st.session_state.employees.loc[st.session_state.employees["كود الموظف"] == emp_code, "رسمي مستهلك"] += days
+                            st.session_state.employees.loc[st.session_state.employees["كود الموظف"] == emp_code, "رسمي متبقي"] -= days
+                    
+                    auto_save_data()
+                    st.success(f"تم تحديث الطلب #{req_id} وحفظ البيانات بنجاح!")
+                    st.rerun()
+
+elif choice == "تسجيل طلب إجازة":
+    st.subheader(f"📝 تقديم طلب إجازة جديد - {company_display_name}")
+    emp_list = st.session_state.employees["اسم الموظف"].dropna().astype(str).tolist()
+    
+    if not emp_list:
+        st.warning("لا توجد موظفون متاحون لتسجيل إجازة لهم.")
+    else:
+        with st.form("leave_form"):
+            emp_name = st.selectbox("اسم الموظف", emp_list)
+            leave_type = st.selectbox("نوع الإجازة", ["إجازة سنوية (Annual)", "إجازة أسبوعية / عارضة", "إجازة رسمية", "بدون أجر"])
+            col_d1, col_d2 = st.columns(2)
+            with col_d1: start_date = st.date_input("من تاريخ")
+            with col_d2: end_date = st.date_input("إلى تاريخ")
+            reason = st.text_area("سبب الإجازة / ملاحظات إضافية")
+            submit = st.form_submit_button("إرسال طلب الإجازة للمراجعة")
+            
+            if submit:
+                days = (end_date - start_date).days + 1
+                if days <= 0:
+                    st.error("خطأ: تاريخ النهاية يجب أن يكون بعد تاريخ البداية!")
+                else:
+                    emp_row = st.session_state.employees[st.session_state.employees["اسم الموظف"] == emp_name].iloc[0]
+                    emp_code = emp_row["كود الموظف"]
+                    emp_job = emp_row["الوظيفة"]
+                    emp_branch = emp_row["الفرع"]
+                    
+                    new_req = {
+                        "رقم الطلب": int(st.session_state.requests["رقم الطلب"].max() + 1) if not st.session_state.requests.empty else 101,
+                        "كود الموظف": emp_code, "اسم الموظف": emp_name, "الوظيفة": emp_job, "الفرع": emp_branch,
+                        "نوع الإجازة": leave_type, "من تاريخ": str(start_date), "إلى تاريخ": str(end_date), "عدد الأيام": days, "الحالة": "قيد الانتظار"
+                    }
+                    st.session_state.requests = pd.concat([st.session_state.requests, pd.DataFrame([new_req])], ignore_index=True)
+                    auto_save_data()
+                    st.success("تم تقديم طلب الإجازة وحفظه تلقائياً في ملف الشركة!")
+
+elif choice == "إدارة وفهرس الموظفين":
+    st.subheader(f"👥 دليل الموظفين والأرصدة - {company_display_name}")
+    with st.expander("➕ إضافة موظف جديد"):
+        with st.form("add_employee_form"):
+            c_code = st.text_input("كود الموظف")
+            c_name = st.text_input("اسم الموظف الكامل")
+            c_job = st.text_input("الوظيفة")
+            c_dept = st.text_input("القسم")
+            c_branch = st.text_input("الفرع")
+            c_emp_permission = st.selectbox("صلاحية الموظف المخصصة", ["إدخال طلبات فقط", "اعتماد الطلبات", "مدير شؤون إدارية", "صلاحيات كاملة للقسم"])
+            
+            col_b1, col_b2, col_b3 = st.columns(3)
+            with col_b1: c_annual = st.number_input("الرصيد السنوي", min_value=0, value=21)
+            with col_b2: c_weekly = st.number_input("الرصيد الأسبوعي", min_value=0, value=4)
+            with col_b3: c_official = st.number_input("رصيد الإجازات الرسمية", min_value=0, value=10)
+            
+            add_emp_btn = st.form_submit_button("إضافة الموظف")
+            if add_emp_btn:
+                if c_code and c_name:
+                    new_emp = {
+                        "كود الموظف": c_code, "اسم الموظف": c_name, "الوظيفة": c_job, "القسم": c_dept, "الفرع": c_branch, "صلاحية الموظف": c_emp_permission,
+                        "رصيد سنوي (إجمالي)": c_annual, "سنوي مستهلك": 0, "سنوي متبقي": c_annual,
+                        "رصيد أسبوعي (إجمالي)": c_weekly, "أسبوعي مستهلك": 0, "أسبوعي متبقي": c_weekly,
+                        "رصيد رسمي (إجمالي)": c_official, "رسمي مستهلك": 0, "رسمي متبقي": c_official
+                    }
+                    st.session_state.employees = pd.concat([st.session_state.employees, pd.DataFrame([new_emp])], ignore_index=True)
+                    auto_save_data()
+                    st.success("تم إضافة الموظف وحفظ البيانات تلقائياً!")
+                    st.rerun()
+    render_printable_table(st.session_state.employees)
+
+elif choice == "🔍 بحث متقدم":
+    st.subheader("🔍 شاشة البحث المتقدم")
+    names_opt = ["الكل"] + sorted(st.session_state.employees["اسم الموظف"].dropna().astype(str).unique().tolist())
+    sel_name = st.selectbox("اختر اسم الموظف", names_opt)
+    results = st.session_state.employees.copy()
+    if sel_name != "الكل": results = results[results["اسم الموظف"] == sel_name]
+    render_printable_table(results)
+
+elif choice == "إدارة المستخدمين والصلاحيات":
+    st.subheader("🔒 إدارة مستخدمي النظام والصلاحيات")
+    render_printable_table(st.session_state.users.drop(columns=["الرسم السري"], errors="ignore"))
+
+elif choice == "🖨️ طباعة البيانات والتقارير":
+    st.subheader(f"🖨️ التقارير المعتمدة - {company_display_name}")
+    render_printable_table(st
