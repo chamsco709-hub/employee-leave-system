@@ -1024,3 +1024,86 @@ elif choice == "🗑️ مسح وحذف البيانات":
             ])
             st.success("تم المسح بنجاح!")
             st.rerun()
+            import streamlit as st
+import json
+import os
+import pandas as pd
+
+# 1. إعداد اسم الملف
+DATA_FILE = "leave_requests.json"
+
+# 2. دوال التعامل مع ملف JSON
+def load_data():
+    """تحميل البيانات من ملف JSON أو إنشاء قائمة فارغة إذا لم يكن الملف موجوداً"""
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            try:
+                return json.load(f)
+            except json.JSONDecodeError:
+                return []
+    return []
+
+def save_data():
+    """الحفظ التلقائي للبيانات الموجودة في session_state إلى ملف JSON"""
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(st.session_state.leaves, f, ensure_ascii=False, indent=4)
+
+# 3. تهيئة البيانات في Streamlit Session State عند بداية التشغيل
+if "leaves" not in st.session_state:
+    st.session_state.leaves = load_data()
+
+# --- واجهة التطبيق ---
+st.title("🌴 نظام إدارة الإجازات - الحفظ التلقائي")
+
+# قسم إضافة طلب إجازة جديد
+st.subheader("إضافة طلب إجازة جديد")
+with st.form("leave_form", clear_on_submit=True):
+    emp_name = st.text_input("اسم الموظف:")
+    leave_type = st.selectbox("نوع الإجازة:", ["سنوية", "مرضية", "بدون راتب", "طارئة"])
+    days = st.number_input("عدد الأيام:", min_value=1, max_value=30, value=1)
+    
+    submitted = st.form_submit_button("إرسال الطلب")
+    
+    if submitted:
+        if emp_name.strip():
+            # إضافة الطلب للذاكرة
+            new_request = {
+                "employee": emp_name,
+                "type": leave_type,
+                "days": days,
+                "status": "قيد الانتظار"
+            }
+            st.session_state.leaves.append(new_request)
+            
+            # --- إجراء الحفظ التلقائي فوراً ---
+            save_data()
+            st.success(f"تم حفظ طلب الموظف ({emp_name}) تلقائياً في ملف JSON!")
+        else:
+            st.error("يرجى إدخال اسم الموظف.")
+
+st.divider()
+
+# قسم عرض وتعديل البيانات الحالية
+st.subheader("📋 الطلبات المسجلة (حفظ فوري)")
+
+if st.session_state.leaves:
+    # تحويل البيانات إلى جدول لعرضها
+    df = pd.DataFrame(st.session_state.leaves)
+    st.dataframe(df, use_container_width=True)
+    
+    # إمكانية حذف طلب مع الحفظ التلقائي
+    st.write("---")
+    st.write("**إدارة الطلبات:**")
+    names_list = [f"{i}: {req['employee']} ({req['type']})" for i, req in enumerate(st.session_state.leaves)]
+    selected_to_delete = st.selectbox("اختر طلباً لحذفه:", names_list)
+    
+    if st.button("حذف الطلب المحدد"):
+        index_to_delete = int(selected_to_delete.split(":")[0])
+        removed_item = st.session_state.leaves.pop(index_to_delete)
+        
+        # --- تحديث الحفظ التلقائي بعد الحذف ---
+        save_data()
+        st.warning(f"تم حذف طلب ({removed_item['employee']}) وتحديث الملف تلقائياً.")
+        st.rerun()
+else:
+    st.info("لا توجد طلبات إجازة مسجلة حالياً.")
