@@ -43,7 +43,6 @@ st.set_page_config(
 st.sidebar.title("🏢 بوابة إدارة الشركات")
 registered_companies = load_registered_companies()
 
-# خيار لاختيار شركة مسجلة أو إضافة شركة جديدة
 comp_options = list(registered_companies.keys()) + ["➕ إضافة شركة جديدة وترخيص..."]
 selected_comp_choice = st.sidebar.selectbox("اختر الشركة للتشغيل:", comp_options)
 
@@ -66,36 +65,54 @@ if selected_comp_choice == "➕ إضافة شركة جديدة وترخيص...":
                         "name": new_c_name
                     }
                     save_registered_companies(registered_companies)
-                    st.sidebar.success(f"تم تسجيل شركة {new_c_name} بنجاح! يرجى اختيارها من القائمة.")
+                    st.sidebar.success(f"تم تسجيل شركة {new_c_name} بنجاح!")
                     st.rerun()
             else:
                 st.sidebar.error("يرجى ملء جميع الحقول المطلوبة.")
     st.stop()
 
-# تحديد كود الشركة النشطة حالياً
+# تحديد بيانات الشركة النشطة حالياً
 current_comp_data = registered_companies[selected_comp_choice]
 company_id = current_comp_data["id"]
 company_license = current_comp_data["license"]
 company_display_name = current_comp_data["name"]
 
-# مسار ملف البيانات المعزول للشركة المختارة
 COMPANY_FILE = os.path.join(COMPANIES_DIR, f"{company_id}_data.json")
 
 # ---------------------------------------------------------
 # 💾 دوال الحفظ والاستعادة التلقائية المعزولة لكل شركة
 # ---------------------------------------------------------
 def load_company_data():
-    """تحميل بيانات الشركة الحالية المعزولة تماماً عن باقي الشركات"""
+    """تحميل بيانات الشركة الحالية المعزولة تماماً مع ضمان وجود كافة الأعمدة"""
     if os.path.exists(COMPANY_FILE):
         try:
             with open(COMPANY_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
+                
                 if "employees" in data and len(data["employees"]) > 0:
                     st.session_state.employees = pd.DataFrame(data["employees"])
+                else:
+                    st.session_state.employees = pd.DataFrame(columns=[
+                        "كود الموظف", "اسم الموظف", "الوظيفة", "القسم", "الفرع", "صلاحية الموظف",
+                        "رصيد سنوي (إجمالي)", "سنوي مستهلك", "سنوي متبقي",
+                        "رصيد أسبوعي (إجمالي)", "أسبوعي مستهلك", "أسبوعي متبقي",
+                        "رصيد رسمي (إجمالي)", "رسمي مستهلك", "رسمي متبقي"
+                    ])
+
                 if "requests" in data and len(data["requests"]) > 0:
                     st.session_state.requests = pd.DataFrame(data["requests"])
+                else:
+                    st.session_state.requests = pd.DataFrame(columns=[
+                        "رقم الطلب", "كود الموظف", "اسم الموظف", "الوظيفة", "الفرع", "نوع الإجازة", "من تاريخ", "إلى تاريخ", "عدد الأيام", "الحالة"
+                    ])
+
                 if "users" in data and len(data["users"]) > 0:
                     st.session_state.users = pd.DataFrame(data["users"])
+                else:
+                    st.session_state.users = pd.DataFrame([
+                        {"اسم المستخدم": "admin", "الاسم الكامل": "المدير العام", "الفرع التابع": "المركز الرئيسي", "القسم التابع": "الإدارة العليا", "الصلاحية": "مشرف عام (Admin)", "البريد الإلكتروني": "admin@company.com", "الحالة": "نشط", "الرسم السري": "1-2-3"}
+                    ])
+
                 if "company_info" in data:
                     st.session_state.company_info = data["company_info"]
         except Exception as e:
@@ -140,7 +157,6 @@ def auto_save_data():
     except Exception as e:
         print(f"خطأ في الحفظ التلقائي: {e}")
 
-# ضمان تحديث اسم الشركة في الجلسة ليطابق الشركة المختارة
 load_company_data()
 st.session_state.company_info["name"] = company_display_name
 st.session_state.company_info["license"] = company_license
@@ -291,6 +307,13 @@ def render_printable_table(df):
 
 def render_company_header():
     info = st.session_state.company_info
+    logo_html = '<div style="padding: 2px 4px; border: 1px dashed white; border-radius: 3px; font-size: 8px; color: white;">🏢 الشعار</div>'
+    if info.get("logo") is not None:
+        try:
+            logo_html = f'<img src="data:image/png;base64,{info.get("logo")}" alt="Logo" style="max-height: 38px; max-width: 75px; object-fit: contain; background: white; border-radius: 3px; padding: 1px;" />'
+        except Exception:
+            pass
+            
     st.markdown(f"""
         <div class="company-header-container">
             <div class="header-top-system">
@@ -301,6 +324,9 @@ def render_company_header():
                     <div class="comp-name-txt">{info.get("name", "")}</div>
                     <div class="comp-info-txt">📍 {info.get("address", "")} &nbsp;|&nbsp; 📋 سجل: {info.get("cr", "")} &nbsp;|&nbsp; 🧾 ضريبي: {info.get("tax", "")} &nbsp;|&nbsp; 🔑 ترخيص: {info.get("license", "")}</div>
                     <div class="comp-info-txt">📞 {info.get("contact", "")}</div>
+                </div>
+                <div class="header-left-logo">
+                    {logo_html}
                 </div>
             </div>
         </div>
@@ -531,7 +557,7 @@ elif choice == "🖨️ طباعة البيانات والتقارير":
     render_printable_table(st.session_state.employees)
 
 elif choice == "⚙️ إعدادات وبيانات الشركة":
-    st.subheader("⚙️ إعدادات وتعديل بيانات الشركة وترخيصها")
+    st.subheader("⚙️ إعدادات وتعديل بيانات الشركة وشعارها الرسمي")
     with st.form("company_settings_form"):
         c_name = st.text_input("اسم الشركة / المؤسسة", value=st.session_state.company_info.get("name", ""))
         c_license = st.text_input("رقم الترخيص", value=st.session_state.company_info.get("license", ""))
@@ -540,7 +566,8 @@ elif choice == "⚙️ إعدادات وبيانات الشركة":
         with col_s1: c_cr = st.text_input("رقم السجل التجاري", value=st.session_state.company_info.get("cr", ""))
         with col_s2: c_tax = st.text_input("رقم البطاقة الضريبية", value=st.session_state.company_info.get("tax", ""))
         c_contact = st.text_area("بيانات التواصل", value=st.session_state.company_info.get("contact", ""))
-        save_settings = st.form_submit_button("حفظ التغييرات")
+        uploaded_logo = st.file_uploader("رفع شعار الشركة (Logo) بصيغة PNG أو JPG", type=["png", "jpg", "jpeg"])
+        save_settings = st.form_submit_button("حفظ التغييرات والشعار")
         
         if save_settings:
             st.session_state.company_info["name"] = c_name
@@ -549,8 +576,15 @@ elif choice == "⚙️ إعدادات وبيانات الشركة":
             st.session_state.company_info["cr"] = c_cr
             st.session_state.company_info["tax"] = c_tax
             st.session_state.company_info["contact"] = c_contact
+            if uploaded_logo is not None:
+                try:
+                    bytes_data = uploaded_logo.getvalue()
+                    b64_str = base64.b64encode(bytes_data).decode()
+                    st.session_state.company_info["logo"] = b64_str
+                except Exception as e:
+                    st.error(f"خطأ أثناء معالجة الشعار: {e}")
             auto_save_data()
-            st.success("تم تحديث بيانات الشركة وترخيصها بنجاح!")
+            st.success("تم تحديث بيانات الشركة والشعار بنجاح!")
             st.rerun()
 
 elif choice == "📥 تحميل البيانات (Excel)":
