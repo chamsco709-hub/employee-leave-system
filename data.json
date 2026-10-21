@@ -1,0 +1,39 @@
+import json
+import os
+import streamlit as st
+
+DATA_FILE = "data.json"
+
+
+# 1. دالة تحميل البيانات تلقائياً عند فتح التطبيق
+def load_data():
+  if os.path.exists(DATA_FILE):
+    try:
+      with open(DATA_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+    except Exception as e:
+      st.error(f"خطأ في تحميل البيانات: {e}")
+  return {"employees": [], "leaves": []}  # البيانات الافتراضية في حال عدم وجود الملف
+
+
+# 2. دالة حفظ البيانات تلقائياً فور أي تغيير
+def save_data():
+  data = {
+      "employees": st.session_state.get("employees", []),
+      "leaves": st.session_state.get("leaves", []),
+  }
+  with open(DATA_FILE, "w", encoding="utf-8") as f:
+    json.dump(data, f, ensure_ascii=False, indent=4)
+
+
+# 3. تهيئة البيانات في session_state عند بداية التشغيل
+if "initialized" not in st.session_state:
+  saved_data = load_data()
+  st.session_state["employees"] = saved_data.get("employees", [])
+  st.session_state["leaves"] = saved_data.get("leaves", [])
+  st.session_state["initialized"] = True
+
+# --- مثال على حفظ الموظف تلقائياً عند الإضافة ---
+# عند استلام البيانات من النموذج (Form):
+# st.session_state['employees'].append(new_employee)
+# save_data()  # <--- استدعاء الحفظ التلقائي فوراً
