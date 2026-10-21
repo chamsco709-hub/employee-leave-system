@@ -484,344 +484,73 @@ elif choice == "تسجيل طلب إجازة":
                     st.success("تم تقديم طلب الإجازة وحفظه تلقائياً في ملف الشركة!")
 
 elif choice == "إدارة وفهرس الموظفين":
-    st.subheader("👥 دليل وأقسام الموظفين والفروع والوظائف والصلاحيات")
-    
-    with st.expander("➕ إضافة موظف جديد مع تحديد الوظيفة والفرع والأرصدة"):
+    st.subheader(f"👥 دليل الموظفين والأرصدة - {company_display_name}")
+    with st.expander("➕ إضافة موظف جديد"):
         with st.form("add_employee_form"):
-            c_code = st.text_input("كود الموظف (مثال: EMP003)")
+            c_code = st.text_input("كود الموظف")
             c_name = st.text_input("اسم الموظف الكامل")
-            c_job = st.text_input("الوظيفة (مثال: مهندس، محاسب، مشرف)")
+            c_job = st.text_input("الوظيفة")
             c_dept = st.text_input("القسم")
-            c_branch = st.text_input("الفرع", value=st.session_state.current_user_branch if "Admin" not in st.session_state.current_user_role else "")
-            c_emp_permission = st.selectbox("صلاحية الموظف المخصصة", [
-                "إدخال طلبات فقط",
-                "اعتماد الطلبات",
-                "مدير شؤون إدارية",
-                "صلاحيات كاملة للقسم"
-            ])
+            c_branch = st.text_input("الفرع")
+            c_emp_permission = st.selectbox("صلاحية الموظف المخصصة", ["إدخال طلبات فقط", "اعتماد الطلبات", "مدير شؤون إدارية", "صلاحيات كاملة للقسم"])
             
-            st.markdown("#### ⚖️ تخصيص الأرصدة:")
             col_b1, col_b2, col_b3 = st.columns(3)
-            with col_b1:
-                c_annual = st.number_input("الرصيد السنوي", min_value=0, value=21)
-            with col_b2:
-                c_weekly = st.number_input("الرصيد الأسبوعي", min_value=0, value=4)
-            with col_b3:
-                c_official = st.number_input("رصيد الإجازات الرسمية", min_value=0, value=10)
+            with col_b1: c_annual = st.number_input("الرصيد السنوي", min_value=0, value=21)
+            with col_b2: c_weekly = st.number_input("الرصيد الأسبوعي", min_value=0, value=4)
+            with col_b3: c_official = st.number_input("رصيد الإجازات الرسمية", min_value=0, value=10)
             
-            add_emp_btn = st.form_submit_button("إضافة الموظف والوظيفة والفرع")
+            add_emp_btn = st.form_submit_button("إضافة الموظف")
             if add_emp_btn:
                 if c_code and c_name:
-                    if c_code in st.session_state.employees["كود الموظف"].values:
-                        st.error("كود الموظف موجود مسبقاً!")
-                    else:
-                        new_emp = {
-                            "كود الموظف": c_code,
-                            "اسم الموظف": c_name,
-                            "الوظيفة": c_job,
-                            "القسم": c_dept,
-                            "الفرع": c_branch,
-                            "صلاحية الموظف": c_emp_permission,
-                            "رصيد سنوي (إجمالي)": c_annual, "سنوي مستهلك": 0, "سنوي متبقي": c_annual,
-                            "رصيد أسبوعي (إجمالي)": c_weekly, "أسبوعي مستهلك": 0, "أسبوعي متبقي": c_weekly,
-                            "رصيد رسمي (إجمالي)": c_official, "رسمي مستهلك": 0, "رسمي متبقي": c_official
-                        }
-                        st.session_state.employees = pd.concat([st.session_state.employees, pd.DataFrame([new_emp])], ignore_index=True)
-                        st.success("تم إضافة الموظف بوظيفته وفرعه بنجاح!")
-                        st.rerun()
-                else:
-                    st.error("يرجى إدخال الكود واسم الموظف على الأقل.")
-
-    st.markdown("---")
-    st.markdown("### 🛠️ تعديل أو حذف موظف ووظيفته وفرعه")
-    branch_filter = st.session_state.current_user_branch
-    dept_filter = st.session_state.current_user_dept
-    
-    if "Admin" in st.session_state.current_user_role or "الإدارة العليا" in dept_filter:
-        editable_emps = st.session_state.employees
-    else:
-        editable_emps = st.session_state.employees[st.session_state.employees["الفرع"] == branch_filter]
-        
-    emp_names_list = editable_emps["اسم الموظف"].dropna().astype(str).tolist()
-    
-    if not emp_names_list:
-        st.info("لا يوجد موظفون متاحون للتعديل في صلاحيات فرعك.")
-    else:
-        selected_emp_name = st.selectbox("اختر الموظف للتعديل أو الحذف", emp_names_list)
-        emp_row = st.session_state.employees[st.session_state.employees["اسم الموظف"] == selected_emp_name].iloc[0]
-        
-        with st.form("edit_delete_employee_form"):
-            e_code = st.text_input("كود الموظف", value=str(emp_row["كود الموظف"]), disabled=True)
-            e_name = st.text_input("اسم الموظف", value=str(emp_row["اسم الموظف"]))
-            e_job = st.text_input("الوظيفة", value=str(emp_row.get("الوظيفة", "")))
-            e_dept = st.text_input("القسم", value=str(emp_row["القسم"]))
-            e_branch = st.text_input("الفرع", value=str(emp_row["الفرع"]))
-            
-            perms_list = ["إدخال طلبات فقط", "اعتماد الطلبات", "مدير شؤون إدارية", "صلاحيات كاملة للقسم"]
-            current_perm = emp_row["صلاحية الموظف"] if "صلاحية الموظف" in emp_row and emp_row["صلاحية الموظف"] in perms_list else "إدخال طلبات فقط"
-            e_emp_permission = st.selectbox("صلاحية الموظف المخصصة", perms_list, index=perms_list.index(current_perm))
-            
-            st.markdown("#### تعديل الأرصدة والمستهلك:")
-            col_e1, col_e2, col_e3 = st.columns(3)
-            with col_e1:
-                e_annual = st.number_input("الرصيد السنوي", min_value=0, value=int(emp_row["رصيد سنوي (إجمالي)"]))
-                e_annual_cons = st.number_input("سنوي مستهلك", min_value=0, value=int(emp_row["سنوي مستهلك"]))
-            with col_e2:
-                e_weekly = st.number_input("الرصيد الأسبوعي", min_value=0, value=int(emp_row["رصيد أسبوعي (إجمالي)"]))
-                e_weekly_cons = st.number_input("أسبوعي مستهلك", min_value=0, value=int(emp_row["أسبوعي مستهلك"]))
-            with col_e3:
-                e_official = st.number_input("رصيد رسمي", min_value=0, value=int(emp_row["رصيد رسمي (إجمالي)"]))
-                e_official_cons = st.number_input("رسمي مستهلك", min_value=0, value=int(emp_row["رسمي مستهلك"]))
-                
-            e_annual_rem = e_annual - e_annual_cons
-            e_weekly_rem = e_weekly - e_weekly_cons
-            e_official_rem = e_official - e_official_cons
-            
-            col_f1, col_f2 = st.columns(2)
-            with col_f1:
-                update_btn = st.form_submit_button("💾 حفظ التعديلات", use_container_width=True)
-            with col_f2:
-                delete_btn = st.form_submit_button("🗑️ حذف الموظف نهائياً", use_container_width=True)
-                
-            if update_btn:
-                st.session_state.employees.loc[st.session_state.employees["كود الموظف"] == emp_row["كود الموظف"], [
-                    "اسم الموظف", "الوظيفة", "القسم", "الفرع", "صلاحية الموظف",
-                    "رصيد سنوي (إجمالي)", "سنوي مستهلك", "سنوي متبقي",
-                    "رصيد أسبوعي (إجمالي)", "أسبوعي مستهلك", "أسبوعي متبقي",
-                    "رصيد رسمي (إجمالي)", "رسمي مستهلك", "رسمي متبقي"
-                ]] = [
-                    e_name, e_job, e_dept, e_branch, e_emp_permission,
-                    e_annual, e_annual_cons, e_annual_rem,
-                    e_weekly, e_weekly_cons, e_weekly_rem,
-                    e_official, e_official_cons, e_official_rem
-                ]
-                st.success("تم تحديث بيانات الوظيفة والفرع والأرصدة بنجاح!")
-                st.rerun()
-                
-            if delete_btn:
-                st.session_state.employees = st.session_state.employees[st.session_state.employees["كود الموظف"] != emp_row["كود الموظف"]].reset_index(drop=True)
-                st.warning("تم حذف الموظف من النظام بنجاح!")
-                st.rerun()
-
-    st.markdown("---")
-    st.markdown("### 📋 جدول تفاصيل أرصدة ووظائف وفروع الموظفين")
-    render_printable_table(editable_emps)
+                    new_emp = {
+                        "كود الموظف": c_code, "اسم الموظف": c_name, "الوظيفة": c_job, "القسم": c_dept, "الفرع": c_branch, "صلاحية الموظف": c_emp_permission,
+                        "رصيد سنوي (إجمالي)": c_annual, "سنوي مستهلك": 0, "سنوي متبقي": c_annual,
+                        "رصيد أسبوعي (إجمالي)": c_weekly, "أسبوعي مستهلك": 0, "أسبوعي متبقي": c_weekly,
+                        "رصيد رسمي (إجمالي)": c_official, "رسمي مستهلك": 0, "رسمي متبقي": c_official
+                    }
+                    st.session_state.employees = pd.concat([st.session_state.employees, pd.DataFrame([new_emp])], ignore_index=True)
+                    auto_save_data()
+                    st.success("تم إضافة الموظف وحفظ البيانات تلقائياً!")
+                    st.rerun()
+    render_printable_table(st.session_state.employees)
 
 elif choice == "🔍 بحث متقدم":
-    st.subheader("🔍 شاشة البحث المتقدم بالخيارات المنسدلة")
-    
-    # تحضير قوائم البيانات المنسدلة للبحث
+    st.subheader("🔍 شاشة البحث المتقدم")
     names_opt = ["الكل"] + sorted(st.session_state.employees["اسم الموظف"].dropna().astype(str).unique().tolist())
-    branches_opt = ["الكل"] + sorted(st.session_state.employees["الفرع"].dropna().astype(str).unique().tolist())
-    jobs_opt = ["الكل"] + sorted(st.session_state.employees["الوظيفة"].dropna().astype(str).unique().tolist())
-    codes_opt = ["الكل"] + sorted(st.session_state.employees["كود الموظف"].dropna().astype(str).unique().tolist())
-    
-    col_s1, col_s2 = st.columns(2)
-    with col_s1:
-        sel_name = st.selectbox("اختر اسم الموظف", names_opt)
-        sel_branch = st.selectbox("اختر الفرع", branches_opt)
-    with col_s2:
-        sel_job = st.selectbox("اختر الوظيفة", jobs_opt)
-        sel_code = st.selectbox("اختر كود الموظف", codes_opt)
-        
-    # تصفية البيانات تلقائياً وتحديث النتائج فوراً
+    sel_name = st.selectbox("اختر اسم الموظف", names_opt)
     results = st.session_state.employees.copy()
-    
-    if sel_name != "الكل":
-        results = results[results["اسم الموظف"] == sel_name]
-    if sel_branch != "الكل":
-        results = results[results["الفرع"] == sel_branch]
-    if sel_job != "الكل":
-        results = results[results["الوظيفة"] == sel_job]
-    if sel_code != "الكل":
-        results = results[results["كود الموظف"] == sel_code]
-        
-    st.markdown(f"### 📋 نتائج البحث ({len(results)} نتيجة مطابقة):")
+    if sel_name != "الكل": results = results[results["اسم الموظف"] == sel_name]
     render_printable_table(results)
 
 elif choice == "إدارة المستخدمين والصلاحيات":
-    st.subheader("🔒 إدارة مستخدمي النظام وفروعهم وأقسامهم والصلاحيات والرسوم السرية")
-    
-    with st.expander("➕ إضافة مستخدم جديد وتحديد الفرع والقسم والصلاحية والرسوم السري"):
-        with st.form("add_user_form"):
-            u_username = st.text_input("اسم المستخدم (Username - مثال: m_ali)")
-            u_fullname = st.text_input("الاسم الكامل للمستخدم")
-            u_email = st.text_input("البريد الإلكتروني")
-            u_branch_target = st.text_input("الفرع التابع له (مثال: المركز الرئيسي، فرع الإسكندرية)")
-            u_dept_target = st.text_input("القسم التابع له (مثال: الموارد البشرية، الإدارة المالية)")
-            u_role = st.selectbox("صلاحية المستخدم", [
-                "مشرف عام (Admin)", 
-                "مفوض الموارد البشرية (HR Manager)", 
-                "مدير فرع / قسم", 
-                "مستخدم عادي (Viewer)"
-            ])
-            u_status = st.selectbox("حالة الحساب", ["نشط", "موقوف"])
-            u_pattern = st.text_input("الرسم السري (Pattern) - مثل: 1-2-3-6", placeholder="أدخل تسلسل النقاط للرسم السري")
-            
-            add_user_btn = st.form_submit_button("إضافة المستخدم الجديد")
-            if add_user_btn:
-                if u_username and u_fullname and u_pattern and u_branch_target:
-                    if u_username in st.session_state.users["اسم المستخدم"].values:
-                        st.error("اسم المستخدم هذا موجود مسبقاً!")
-                    else:
-                        new_user = {
-                            "اسم المستخدم": u_username,
-                            "الاسم الكامل": u_fullname,
-                            "الفرع التابع": u_branch_target,
-                            "القسم التابع": u_dept_target,
-                            "الصلاحية": u_role,
-                            "البريد الإلكتروني": u_email,
-                            "الحالة": u_status,
-                            "الرسم السري": u_pattern
-                        }
-                        st.session_state.users = pd.concat([st.session_state.users, pd.DataFrame([new_user])], ignore_index=True)
-                        st.success("تم إضافة المستخدم وفرعه وقسمه وصلاحيته ورسمه السري بنجاح!")
-                        st.rerun()
-                else:
-                    st.error("يرجى إدخال اسم المستخدم، الاسم الكامل، الفرع التابع، والرسم السري.")
-
-    st.markdown("---")
-    st.markdown("### 🛠️ تعديل أو حذف مستخدم وفروعه وصلاحياته")
-    user_list = st.session_state.users["اسم المستخدم"].dropna().astype(str).tolist()
-    
-    if not user_list:
-        st.info("لا توجد حسابات مستخدمين مسجلة.")
-    else:
-        selected_username = st.selectbox("اختر اسم المستخدم للتعديل أو الحذف", user_list)
-        user_row = st.session_state.users[st.session_state.users["اسم المستخدم"] == selected_username].iloc[0]
-        
-        with st.form("edit_delete_user_form"):
-            e_uname = st.text_input("اسم المستخدم", value=str(user_row["اسم المستخدم"]), disabled=True)
-            e_fullname = st.text_input("الاسم الكامل", value=str(user_row["الاسم الكامل"]))
-            e_branch_target = st.text_input("الفرع التابع", value=str(user_row["الفرع التابع"]))
-            e_dept_target = st.text_input("القسم التابع", value=str(user_row["القسم التابع"]))
-            e_email = st.text_input("البريد الإلكتروني", value=str(user_row["البريد الإلكتروني"]))
-            
-            roles_list = ["مشرف عام (Admin)", "مفوض الموارد البشرية (HR Manager)", "مدير فرع / قسم", "مستخدم عادي (Viewer)"]
-            current_role_idx = roles_list.index(user_row["الصلاحية"]) if user_row["الصلاحية"] in roles_list else 0
-            e_role = st.selectbox("صلاحية المستخدم", roles_list, index=current_role_idx)
-            
-            status_list = ["نشط", "موقوف"]
-            current_status_idx = status_list.index(user_row["الحالة"]) if user_row["الحالة"] in status_list else 0
-            e_status = st.selectbox("حالة الحساب", status_list, index=current_status_idx)
-            
-            e_pattern = st.text_input("الرسم السري الجديد (Pattern)", value=str(user_row["الرسم السري"]))
-            
-            col_u1, col_u2 = st.columns(2)
-            with col_u1:
-                update_user_btn = st.form_submit_button("💾 حفظ تعديلات المستخدم", use_container_width=True)
-            with col_u2:
-                delete_user_btn = st.form_submit_button("🗑️ حذف المستخدم نهائياً", use_container_width=True)
-                
-            if update_user_btn:
-                st.session_state.users.loc[st.session_state.users["اسم المستخدم"] == selected_username, [
-                    "الاسم الكامل", "الفرع التابع", "القسم التابع", "البريد الإلكتروني", "الصلاحية", "الحالة", "الرسم السري"
-                ]] = [e_fullname, e_branch_target, e_dept_target, e_email, e_role, e_status, e_pattern]
-                st.success("تم تحديث بيانات وفرع وقسم وصلاحيات المستخدم بنجاح!")
-                st.rerun()
-                
-            if delete_user_btn:
-                if len(st.session_state.users) <= 1:
-                    st.error("لا يمكن حذف آخر مستخدم في النظام!")
-                else:
-                    st.session_state.users = st.session_state.users[st.session_state.users["اسم المستخدم"] != selected_username].reset_index(drop=True)
-                    st.warning("تم حذف المستخدم بنجاح!")
-                    st.rerun()
-
-    st.markdown("---")
-    st.markdown("### 📋 جدول مستخدمي النظام وفروعهم وأقسامهم والصلاحيات الحالية")
-    display_users_df = st.session_state.users.drop(columns=["الرسم السري"], errors="ignore")
-    render_printable_table(display_users_df)
+    st.subheader("🔒 إدارة مستخدمي النظام والصلاحيات")
+    render_printable_table(st.session_state.users.drop(columns=["الرسم السري"], errors="ignore"))
 
 elif choice == "🖨️ طباعة البيانات والتقارير":
-    report_type = st.selectbox("اختر نوع التقرير المُراد طباعته:", [
-        "تقرير شامل لجميع الموظفين",
-        "تقرير مخصص حسب (اسم الموظف)",
-        "تقرير مخصص حسب (الفرع)",
-        "تقرير مخصص حسب (القسم)",
-        "تقرير مخصص حسب (كود الموظف)"
-    ])
-    
-    st.components.v1.html(
-        '<div style="text-align: right; margin: 2px 0;">'
-        '<button onclick="parent.window.print();" style="background-color: #1f4068; color: white; padding: 6px 12px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 12px; width: 100%;">'
-        '🖨️ طباعة التقرير الحالي / حفظ PDF (اضغط هنا للطباعة)'
-        '</button>'
-        '</div>',
-        height=38
-    )
-    
-    branch_filter = st.session_state.current_user_branch
-    dept_filter = st.session_state.current_user_dept
-    is_admin_or_top = "Admin" in st.session_state.current_user_role or "الإدارة العليا" in dept_filter
-    base_emps = st.session_state.employees if is_admin_or_top else st.session_state.employees[st.session_state.employees["الفرع"] == branch_filter]
-
-    if report_type == "تقرير شامل لجميع الموظفين":
-        st.markdown('<div class="report-title">📋 التقرير الشامل لجميع الموظفين وأرصدتهم ووظائفهم</div>', unsafe_allow_html=True)
-        render_printable_table(base_emps)
-        if not st.session_state.requests.empty:
-            st.markdown('<div class="report-title">📋 كافة طلبات الإجازات (متضمنة الفروع والوظائف):</div>', unsafe_allow_html=True)
-            render_printable_table(st.session_state.requests)
-
-    elif report_type == "تقرير مخصص حسب (اسم الموظف)":
-        emp_names = base_emps["اسم الموظف"].dropna().astype(str).tolist()
-        if emp_names:
-            chosen_name = st.selectbox("اختر اسم الموظف للتقرير", emp_names)
-            filtered_emp = base_emps[base_emps["اسم الموظف"] == chosen_name]
-            st.markdown(f'<div class="report-title">👤 تقرير الموظف: {chosen_name}</div>', unsafe_allow_html=True)
-            render_printable_table(filtered_emp)
-
-    elif report_type == "تقرير مخصص حسب (الفرع)":
-        branches = base_emps["الفرع"].dropna().astype(str).unique().tolist()
-        if branches:
-            chosen_branch = st.selectbox("اختر الفرع للتقرير", branches)
-            filtered_branch_emps = base_emps[base_emps["الفرع"].astype(str) == chosen_branch]
-            st.markdown(f'<div class="report-title">🏢 تقرير فرع: {chosen_branch}</div>', unsafe_allow_html=True)
-            render_printable_table(filtered_branch_emps)
-
-    elif report_type == "تقرير مخصص حسب (القسم)":
-        departments = base_emps["القسم"].dropna().astype(str).unique().tolist()
-        if departments:
-            chosen_dept = st.selectbox("اختر القسم للتقرير", departments)
-            filtered_dept_emps = base_emps[base_emps["القسم"].astype(str) == chosen_dept]
-            st.markdown(f'<div class="report-title">📂 تقرير قسم: {chosen_dept}</div>', unsafe_allow_html=True)
-            render_printable_table(filtered_dept_emps)
-
-    elif report_type == "تقرير مخصص حسب (كود الموظف)":
-        codes = base_emps["كود الموظف"].dropna().astype(str).unique().tolist()
-        if codes:
-            chosen_code = st.selectbox("اختر كود الموظف للتقرير", codes)
-            filtered_code_emp = base_emps[base_emps["كود الموظف"].astype(str) == chosen_code]
-            st.markdown(f'<div class="report-title">🆔 تقرير الموظف (كود: {chosen_code})</div>', unsafe_allow_html=True)
-            render_printable_table(filtered_code_emp)
+    st.subheader(f"🖨️ التقارير المعتمدة - {company_display_name}")
+    render_printable_table(st.session_state.employees)
 
 elif choice == "⚙️ إعدادات وبيانات الشركة":
-    st.subheader("⚙️ إعدادات وتعديل بيانات الشركة والشعار")
-    
+    st.subheader("⚙️ إعدادات وتعديل بيانات الشركة وترخيصها")
     with st.form("company_settings_form"):
         c_name = st.text_input("اسم الشركة / المؤسسة", value=st.session_state.company_info.get("name", ""))
+        c_license = st.text_input("رقم الترخيص", value=st.session_state.company_info.get("license", ""))
         c_address = st.text_input("عنوان الشركة", value=st.session_state.company_info.get("address", ""))
-        
         col_s1, col_s2 = st.columns(2)
-        with col_s1:
-            c_cr = st.text_input("رقم السجل التجاري", value=st.session_state.company_info.get("cr", ""))
-        with col_s2:
-            c_tax = st.text_input("رقم البطاقة الضريبية", value=st.session_state.company_info.get("tax", ""))
-            
+        with col_s1: c_cr = st.text_input("رقم السجل التجاري", value=st.session_state.company_info.get("cr", ""))
+        with col_s2: c_tax = st.text_input("رقم البطاقة الضريبية", value=st.session_state.company_info.get("tax", ""))
         c_contact = st.text_area("بيانات التواصل", value=st.session_state.company_info.get("contact", ""))
-        uploaded_logo = st.file_uploader("رفع أو تحديث شعار الشركة (Logo)", type=["png", "jpg", "jpeg"])
-        
         save_settings = st.form_submit_button("حفظ التغييرات")
         
         if save_settings:
             st.session_state.company_info["name"] = c_name
+            st.session_state.company_info["license"] = c_license
             st.session_state.company_info["address"] = c_address
             st.session_state.company_info["cr"] = c_cr
             st.session_state.company_info["tax"] = c_tax
             st.session_state.company_info["contact"] = c_contact
-            if uploaded_logo is not None:
-                st.session_state.company_info["logo"] = uploaded_logo
-            st.success("تم تحديث البيانات والشعار بنجاح!")
+            auto_save_data()
+            st.success("تم تحديث بيانات الشركة وترخيصها بنجاح!")
             st.rerun()
 
 elif choice == "📥 تحميل البيانات (Excel)":
