@@ -280,8 +280,7 @@ def render_company_header():
         except Exception:
             pass
             
-    st.markdown(
-        f"""
+    st.markdown(f"""
         <div class="company-header-container">
             <div class="header-top-system">
                 <h2>🏢 النظام المتكامل لإدارة الإجازات - شركة: {info.get("name", "")} (ترخيص: {info.get("license", "")})</h2>
@@ -297,21 +296,16 @@ def render_company_header():
                 </div>
             </div>
         </div>
-        """,
-        unsafe_allow_html=True
-    )
+    """, unsafe_allow_html=True)
 
 # 🔐 شاشة تسجيل الدخول المخصصة للشركة
 if not st.session_state.is_authenticated:
-    st.markdown(
-        f"""
+    st.markdown(f"""
         <div style="max-width: 450px; margin: 40px auto; background: #ffffff; padding: 25px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; direction: rtl;">
             <h2 style="color: #1f4068; margin-bottom: 10px;">🔐 تسجيل الدخول - {company_display_name}</h2>
             <p style="color: #666; font-size: 13px;">رخصة النظام النشطة: {company_license}</p>
         </div>
-        """,
-        unsafe_allow_html=True
-    )
+    """, unsafe_allow_html=True)
     
     col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
     with col_l2:
@@ -568,7 +562,7 @@ elif choice == "📥 تحميل البيانات (Excel)":
     output.seek(0)
     st.download_button(label="تحميل ملف الإكسيل الآن", data=output, file_name=f"Leave_System_{company_id}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-elif choice == "💾 النسخة الاحتياطية":
+elifchoice == "💾 النسخة الاحتياطية":
     st.subheader("💾 إدارة النسخ الاحتياطية")
     backup_dict = {
         "employees": st.session_state.employees.to_dict(orient='records'),
