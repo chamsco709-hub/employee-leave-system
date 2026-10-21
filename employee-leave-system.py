@@ -562,7 +562,7 @@ elif choice == "📥 تحميل البيانات (Excel)":
     output.seek(0)
     st.download_button(label="تحميل ملف الإكسيل الآن", data=output, file_name=f"Leave_System_{company_id}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-elif choice == "💾 النسخة الاحتياطية":
+elifchoice == "💾 النسخة الاحتياطية":
     st.subheader("💾 إدارة النسخ الاحتياطية")
     backup_dict = {
         "employees": st.session_state.employees.to_dict(orient='records'),
@@ -570,6 +570,7 @@ elif choice == "💾 النسخة الاحتياطية":
         "users": st.session_state.users.to_dict(orient='records')
     }
     st.download_button("تحميل النسخة الاحتياطية (JSON)", data=json.dumps(backup_dict, ensure_ascii=False, indent=4), file_name=f"backup_{company_id}.json", mime="application/json")
+
 elif choice == "🗑️ مسح وحذف البيانات":
     st.subheader("🗑️ مسح كافة بيانات الشركة الحالية")
     if st.button("تفريغ بيانات الشركة", type="primary"):
